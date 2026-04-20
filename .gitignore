@@ -1,0 +1,9 @@
+input/*
+!input/README.md
+
+output/*
+!output/README.md
+
+segments.config.json
+.DS_Store
+node_modules/
