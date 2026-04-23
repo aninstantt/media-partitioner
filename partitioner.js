@@ -39,6 +39,7 @@ Config shape:
     "jobs": [
       {
         "input": "source.mp4",
+        "suffix": " (Live)",
         "segments": [
           {
             "title": "Track 01",
@@ -255,7 +256,7 @@ function runFfmpeg(args, segmentLabel) {
   }
 }
 
-function buildOutputFileName(segment, index) {
+function buildOutputFileName(title, segment, index) {
   if (segment.fileName && typeof segment.fileName === "string") {
     const cleaned = sanitizeFileName(segment.fileName.replace(/\.mp3$/i, ""));
     if (!cleaned) {
@@ -265,9 +266,9 @@ function buildOutputFileName(segment, index) {
     return `${cleaned}.mp3`;
   }
 
-  const title = sanitizeFileName(segment.title || `track-${index + 1}`);
+  const sanitized = sanitizeFileName(title || `track-${index + 1}`);
   const prefix = String(index + 1).padStart(2, "0");
-  return `${prefix} - ${title}.mp3`;
+  return `${prefix} - ${sanitized}.mp3`;
 }
 
 function assertFileExists(filePath, label) {
@@ -302,13 +303,14 @@ function processJob(job, jobIndex, defaults) {
       fail(`${segmentLabel} must be an object.`);
     }
 
-    const title = getRequiredStringValue("title", segment);
-    if (!title) {
+    const rawTitle = getRequiredStringValue("title", segment);
+    if (!rawTitle) {
       fail(`${segmentLabel}.title is required.`);
     }
+    const title = job.suffix ? rawTitle + job.suffix : rawTitle;
 
     const { start, duration } = buildSegmentDuration(segment, segmentLabel);
-    const outputFileName = buildOutputFileName(segment, segmentIndex);
+    const outputFileName = buildOutputFileName(title, segment, segmentIndex);
     const outputPath = path.join(OUTPUT_DIR, outputFileName);
 
     const artist = getOptionalStringValue("artist", segment, job, defaults);

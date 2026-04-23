@@ -8,6 +8,7 @@
   "jobs": [
     {
       "input": "source.mp4",
+      "suffix": " (Live)",
       "segments": [
         {
           "title": "Track 01",

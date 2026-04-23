@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node partitioner.js",
     "help": "node partitioner.js --help",
-    "test": "node validate-output.js"
+    "check": "node validate-output.js"
   },
   "engines": {
     "node": ">=24.0.0"

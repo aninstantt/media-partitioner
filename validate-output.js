@@ -73,12 +73,12 @@ function sanitizeFileName(value) {
     .trim();
 }
 
-function buildOutputFileName(segment, index) {
+function buildOutputFileName(title, segment, index) {
   if (typeof segment.fileName === "string" && segment.fileName.trim()) {
     return `${sanitizeFileName(segment.fileName.replace(/\.mp3$/i, ""))}.mp3`;
   }
 
-  return `${String(index + 1).padStart(2, "0")} - ${sanitizeFileName(segment.title)}.mp3`;
+  return `${String(index + 1).padStart(2, "0")} - ${sanitizeFileName(title)}.mp3`;
 }
 
 function getValue(key, segment, job, defaults) {
@@ -183,7 +183,8 @@ function main() {
     for (let segmentIndex = 0; segmentIndex < job.segments.length; segmentIndex += 1) {
       const segment = job.segments[segmentIndex];
       const label = `jobs[${jobIndex}].segments[${segmentIndex}]`;
-      const expectedFileName = buildOutputFileName(segment, segmentIndex);
+      const expectedTitle = job.suffix ? segment.title + job.suffix : segment.title;
+      const expectedFileName = buildOutputFileName(expectedTitle, segment, segmentIndex);
       const outputPath = path.join(OUTPUT_DIR, expectedFileName);
       const errors = [];
 
@@ -193,8 +194,6 @@ function main() {
         hasError = true;
         continue;
       }
-
-      const expectedTitle = segment.title;
       const expectedArtist = getValue("artist", segment, job, defaults);
       const expectedAlbum = getValue("album", segment, job, defaults);
       const expectedDuration = getExpectedDuration(segment, label);
