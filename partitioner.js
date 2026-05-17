@@ -34,7 +34,8 @@ Config shape:
       "artist": "Artist Name",
       "album": "Album Name",
       "cover": "cover.jpg",
-      "bitrate": "320k"
+      "bitrate": "320k",
+      "loudnorm": { "I": -14, "TP": -1 }
     },
     "jobs": [
       {
@@ -50,6 +51,11 @@ Config shape:
       }
     ]
   }
+
+Loudness normalization:
+  Enabled by default (I=-14 LUFS, TP=-1 dBTP).
+  Set to null or false to disable.
+  Set to true for defaults, or an object with I and TP values.
 `.trim());
 }
 
@@ -206,6 +212,36 @@ function getBitrate(...sources) {
   return "320k";
 }
 
+function getLoudnormConfig(...sources) {
+  for (const source of sources) {
+    if (!source || typeof source !== "object") {
+      continue;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(source, "loudnorm")) {
+      continue;
+    }
+
+    const value = source.loudnorm;
+    if (value === null || value === false) {
+      return null;
+    }
+
+    if (value === true) {
+      return { I: -14, TP: -1 };
+    }
+
+    if (typeof value === "object") {
+      return {
+        I: typeof value.I === "number" ? value.I : -14,
+        TP: typeof value.TP === "number" ? value.TP : -1,
+      };
+    }
+  }
+
+  return { I: -14, TP: -1 };
+}
+
 function getRequiredStringValue(key, ...sources) {
   for (const source of sources) {
     if (source && typeof source[key] === "string" && source[key].trim()) {
@@ -253,6 +289,50 @@ function runFfmpeg(args, segmentLabel) {
   if (result.status !== 0) {
     const details = (result.stderr || result.stdout || "").trim();
     fail(`ffmpeg failed for ${segmentLabel}.\n${details}`);
+  }
+}
+
+function analyzeLoudness(inputPath, start, duration, targetI, targetTP) {
+  const args = [
+    "-hide_banner",
+    "-loglevel",
+    "info",
+    "-ss",
+    start,
+    "-t",
+    duration,
+    "-i",
+    inputPath,
+    "-af",
+    `loudnorm=I=${targetI}:TP=${targetTP}:print_format=json`,
+    "-f",
+    "null",
+    "-",
+  ];
+
+  const result = spawnSync("ffmpeg", args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  if (result.error) {
+    fail(`Failed to analyze loudness: ${result.error.message}`);
+  }
+
+  if (result.status !== 0) {
+    fail(`Loudness analysis failed.\n${(result.stderr || "").trim()}`);
+  }
+
+  const stderr = result.stderr || "";
+  const jsonMatch = stderr.match(/\{[\s\S]*?\}/);
+  if (!jsonMatch) {
+    fail("Could not parse loudnorm analysis output.");
+  }
+
+  try {
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    fail("Failed to parse loudnorm analysis JSON.");
   }
 }
 
@@ -317,6 +397,23 @@ function processJob(job, jobIndex, defaults) {
     const album = getOptionalStringValue("album", segment, job, defaults);
     const bitrate = getBitrate(segment, job, defaults);
     const coverRelative = getOptionalStringValue("cover", segment, job, defaults);
+    const loudnormConfig = getLoudnormConfig(segment, job, defaults);
+
+    let loudnormFilter = null;
+    if (loudnormConfig) {
+      console.log(`  Analyzing loudness for ${path.basename(outputPath)}...`);
+      const stats = analyzeLoudness(inputPath, start, duration, loudnormConfig.I, loudnormConfig.TP);
+      loudnormFilter = [
+        `loudnorm=I=${loudnormConfig.I}`,
+        `TP=${loudnormConfig.TP}`,
+        `measured_I=${stats.input_i}`,
+        `measured_TP=${stats.input_tp}`,
+        `measured_LRA=${stats.input_lra}`,
+        `measured_thresh=${stats.input_thresh}`,
+        `offset=${stats.target_offset}`,
+        `linear=true`,
+      ].join(":");
+    }
 
     const args = [
       "-hide_banner",
@@ -349,12 +446,14 @@ function processJob(job, jobIndex, defaults) {
       "-c:a",
       "libmp3lame",
       "-b:a",
-      bitrate,
-      "-id3v2_version",
-      "3",
-      "-metadata",
-      `title=${title}`
+      bitrate
     );
+
+    if (loudnormFilter) {
+      args.push("-af", loudnormFilter);
+    }
+
+    args.push("-id3v2_version", "3", "-metadata", `title=${title}`);
 
     if (artist) {
       args.push("-metadata", `artist=${artist}`, "-metadata", `album_artist=${artist}`);

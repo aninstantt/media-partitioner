@@ -3,7 +3,8 @@
     "artist": "Default Artist",
     "album": "Default Album",
     "cover": null,
-    "bitrate": "320k"
+    "bitrate": "320k",
+    "loudnorm": { "I": -14, "TP": -1 }
   },
   "jobs": [
     {

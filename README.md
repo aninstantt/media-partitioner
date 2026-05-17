@@ -29,6 +29,41 @@ Notes:
 - `cover` is optional.
 - You can omit `cover`, or set `"cover": null`, if you do not want embedded cover art.
 
+## Loudness Normalization
+
+Audio is normalized to **-14 LUFS** by default (the streaming platform standard). This uses a two-pass FFmpeg `loudnorm` filter for precise results.
+
+Config options (in `defaults`, `job`, or `segment`):
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `loudnorm.I` | number | `-14` | **Integrated loudness** target in LUFS. The average perceived loudness of the entire track. -14 is the standard for Spotify, YouTube, Apple Music, etc. |
+| `loudnorm.TP` | number | `-1` | **True Peak** ceiling in dBTP. Prevents clipping when encoded to lossy formats. -1 dB is safe for all platforms. |
+
+Examples:
+
+```jsonc
+// Use defaults (-14 LUFS, -1 dBTP)
+"loudnorm": true
+
+// Custom values
+"loudnorm": { "I": -16, "TP": -0.5 }
+
+// Disable
+"loudnorm": false
+```
+
+Platform reference levels:
+
+| Platform | Target LUFS |
+|---|---|
+| Spotify | -14 |
+| Apple Music | -16 |
+| YouTube | -14 |
+| Amazon Music | -14 |
+| Tidal | -14 |
+| Deezer | -15 |
+
 ## Run
 
 ```bash
